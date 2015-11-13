@@ -46,7 +46,7 @@ __device__ bool basic_test(unsigned long long n){
   return true;
 }
 
-// Exhaustively search possible divisors to confirm a number is prime
+// Exhaustively search possible divisors to confirm a number is prime.
 __device__ bool exact_test(unsigned long long n){
   for(unsigned long long i = 101; i * i < n; i += 2){
     if (!(n % i)) return false;
