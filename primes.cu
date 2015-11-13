@@ -1,5 +1,14 @@
 #include <stdio.h>
 #include <assert.h>
+#include <curand.h>
+#include <curand_kernel.h>
+
+// Placeholder for longer list of primes
+struct list_node{
+  unsigned long long value;
+  list_node* next;
+};
+list_node* prime_list;
 
 // List of primes less than 100 to be checked for divisibility
 __device__ const unsigned long long small_primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
@@ -8,8 +17,14 @@ __device__ const int small_primes_size = 25;
 // Function prototypes
 __device__ bool basic_test(unsigned long long);
 __device__ bool exact_test(unsigned long long);
-__device__ bool fermat_test(unsigned long long);
+__device__ bool fermat_test(unsigned long long, curandState state);
 __device__ bool miller_rabin_test(unsigned long long);
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Kernel functions
+///////////////////////////////////////////////////////////////////////////////
+
 
 // Generate an initial list of numbers to test for primality
 // start must be a multiple of 6 for this to be correct
@@ -32,11 +47,20 @@ __global__ void filterCandidates(int count, unsigned long long* list){
 
 // Perform more rigorous tests to confirm a number is prime
 __global__ void testCandidates(int count, unsigned long long* list){
-  for(int idx = threadIdx.x * count; idx < (threadIdx.x + 1)*count; idx++){
+  int idx = threadIdx.x;
+  curandState state;
+  curand_init(idx, idx, 0, &state);
+  for(int i = threadIdx.x * count; i < (threadIdx.x + 1)*count; i++){
     if (list[idx] == 0) continue;
-    if (!exact_test(list[idx])) list[idx] = 0;
+    if (!fermat_test(list[idx], state)) list[idx] = 0;
   }
 }
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Device helper functions
+///////////////////////////////////////////////////////////////////////////////
+
 
 // Tests for divisibility against the list of small primes
 __device__ bool basic_test(unsigned long long n){
@@ -55,8 +79,21 @@ __device__ bool exact_test(unsigned long long n){
 }
 
 // Perform Fermat's primality test for a given number
-__device__ bool fermat_test(unsigned long long n){
-  return false;
+__device__ bool fermat_test(unsigned long long n, curandState state){
+  int k = 5;
+  for(int i = 0; i < k; i++){
+    double x = curand_uniform_double(&state);
+    unsigned long long a = x * (n-4) + 2;
+    unsigned long long b = 1;
+    unsigned long long e = n-1;
+    while(e > 0){
+      if (e & 1) b = (b * a) % n;
+      e >>= 1;
+      a = (a * a) % n;
+    }
+    if (b != 1) return false;
+  } 
+  return true;
 }
 
 // Perform the Miller-Rabin primality test for a given number
@@ -64,20 +101,42 @@ __device__ bool miller_rabin_test(unsigned long long n){
   return false;
 }
 
+
+///////////////////////////////////////////////////////////////////////////////
+// Host helpers
+///////////////////////////////////////////////////////////////////////////////
+
+// Placeholder for building linked list of primes
+void build_primes(unsigned long long start){
+  list_node* node;
+  cudaMalloc((void**)&node, sizeof(list_node));
+  node->value = 2;
+  node->next = NULL;
+  prime_list = node;
+  for(int i = 3; i * i < start; i+= 2){
+    
+  }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
 // Program main
+///////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv) 
 {
+
   // Initialization
-  const int count = 2;  // Ints to process per thread. Must be even
+  const int count = 20;  // Ints to process per thread. Must be even
   const int num_threads = 32;  // Threads to launch in a single 1-D block
   const int list_size = count * num_threads;
+  const unsigned long long start = 1000000;
   unsigned long long* list;  // Device pointer to potential primes
   cudaMalloc((void**)&list, list_size * sizeof(unsigned long long));
   dim3 gridSize(1,1,1);
   dim3 blockSize(num_threads, 1, 1);
-  
+
   // First, generate a list of prime candidates
-  primeCandidates<<<gridSize, blockSize>>>(count, 60000000000000, list);
+  primeCandidates<<<gridSize, blockSize>>>(count, start, list);
 
   // Second, filter the candidates to quickly eliminate composites
   filterCandidates<<<gridSize, blockSize>>>(count, list);
@@ -93,6 +152,7 @@ int main( int argc, char** argv)
       printf("%llu\n",h_list[i]);
     }
   }
+
   return 0;
 }
 
