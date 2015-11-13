@@ -21,7 +21,7 @@ __global__ void primeCandidates(int count, unsigned long long start, unsigned lo
   }
 }
 
-// Perform basic filters to eliminate obvious composite numbers
+// Perform basic filters to eliminate obvious composite numbers.
 __global__ void filterCandidates(int count, unsigned long long* list){
   for(int i = count*threadIdx.x; i < count*(threadIdx.x+1); i++){
     if (!(basic_test(list[i]))){
