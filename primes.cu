@@ -51,8 +51,16 @@ __global__ void testCandidates(int count, unsigned long long* list){
   curandState state;
   curand_init(idx, idx, 0, &state);
   for(int i = threadIdx.x * count; i < (threadIdx.x + 1)*count; i++){
-    if (list[idx] == 0) continue;
-    if (!fermat_test(list[idx], state)) list[idx] = 0;
+    int exact = 1;
+    if (list[i] == 0) continue;
+    if (!exact_test(list[i])) exact = 0;
+    if (!fermat_test(list[i], state)){
+       if(exact) printf("  %d\n",list[i]);
+       list[i] = 0;
+    }
+    else{
+       if(!exact) printf("    %d\n",list[i]);
+    }
   }
 }
 
@@ -72,7 +80,7 @@ __device__ bool basic_test(unsigned long long n){
 
 // Exhaustively search possible divisors to confirm a number is prime.
 __device__ bool exact_test(unsigned long long n){
-  for(unsigned long long i = 101; i * i < n; i += 2){
+  for(unsigned long long i = 101; i * i <= n; i += 2){
     if (!(n % i)) return false;
   }
   return true;
@@ -80,7 +88,7 @@ __device__ bool exact_test(unsigned long long n){
 
 // Perform Fermat's primality test for a given number
 __device__ bool fermat_test(unsigned long long n, curandState state){
-  int k = 5;
+  int k = 10;
   for(int i = 0; i < k; i++){
     double x = curand_uniform_double(&state);
     unsigned long long a = x * (n-4) + 2;
@@ -126,10 +134,10 @@ int main( int argc, char** argv)
 {
 
   // Initialization
-  const int count = 20;  // Ints to process per thread. Must be even
+  const int count = 32;  // Ints to process per thread. Must be even
   const int num_threads = 32;  // Threads to launch in a single 1-D block
   const int list_size = count * num_threads;
-  const unsigned long long start = 1000000;
+  const unsigned long long start = 60000;
   unsigned long long* list;  // Device pointer to potential primes
   cudaMalloc((void**)&list, list_size * sizeof(unsigned long long));
   dim3 gridSize(1,1,1);
@@ -147,11 +155,14 @@ int main( int argc, char** argv)
   // Copy list back and display (for debugging)
   unsigned long long h_list[list_size];
   cudaMemcpy(h_list, list, list_size * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+  int nprimes = 0;
   for(int i = 0; i < list_size; i++){
     if (h_list[i] != 0) {
       printf("%llu\n",h_list[i]);
+      nprimes++;
     }
   }
+  printf("Number of primes: %d\n",nprimes);
 
   return 0;
 }
