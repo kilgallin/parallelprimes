@@ -2,6 +2,9 @@
 #include <assert.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 // Placeholder for longer list of primes
 struct list_node{
@@ -142,6 +145,15 @@ int main( int argc, char** argv)
   cudaMalloc((void**)&list, list_size * sizeof(unsigned long long));
   dim3 gridSize(1,1,1);
   dim3 blockSize(num_threads, 1, 1);
+  struct timeval tv;
+  struct timezone tz;
+  clock_t startTime, endTime, elapsedTime;
+  double timeInSeconds;
+  long GTODStartTime, GTODEndTime;
+
+  startTime = clock();
+  gettimeofday(&tv, &tz);
+  GTODStartTime = tv.tv_sec * 1000 + tv.tv_usec / 1000;
 
   // First, generate a list of prime candidates
   primeCandidates<<<gridSize, blockSize>>>(count, start, list);
@@ -155,10 +167,19 @@ int main( int argc, char** argv)
   // Copy list back and display (for debugging)
   unsigned long long h_list[list_size];
   cudaMemcpy(h_list, list, list_size * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+
+  gettimeofday(&tv, &tz);
+  GTODEndTime = tv.tv_sec * 1000 + tv.tv_usec / 1000;
+  endTime = clock();
+  elapsedTime = endTime - startTime;
+  timeInSeconds = (elapsedTime / (double)CLOCKS_PER_SEC);
+  printf("        GetTimeOfDay Time= %g\n", (double)(GTODEndTime - GTODStartTime) / 1000.0);
+  printf("        Clock Time       = %g\n", timeInSeconds);
+
   int nprimes = 0;
   for(int i = 0; i < list_size; i++){
     if (h_list[i] != 0) {
-      printf("%llu\n",h_list[i]);
+      //printf("%llu\n",h_list[i]);
       nprimes++;
     }
   }
