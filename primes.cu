@@ -54,15 +54,15 @@ __global__ void testCandidates(int count, unsigned long long* list){
   curandState state;
   curand_init(idx, idx, 0, &state);
   for(int i = threadIdx.x * count; i < (threadIdx.x + 1)*count; i++){
-    int exact = 1;
+//    int exact = 1;
     if (list[i] == 0) continue;
-    if (!exact_test(list[i])) exact = 0;
+//    if (!exact_test(list[i])) exact = 0;
     if (!fermat_test(list[i], state)){
-       if(exact) printf("  %d\n",list[i]);
+//       if(exact) printf("  %d\n",list[i]);
        list[i] = 0;
     }
     else{
-       if(!exact) printf("    %d\n",list[i]);
+//       if(!exact) printf("    %d\n",list[i]);
     }
   }
 }
@@ -137,10 +137,11 @@ int main( int argc, char** argv)
 {
 
   // Initialization
-  const int count = 32;  // Ints to process per thread. Must be even
+  const int count = 3200;
+ // Ints to process per thread. Must be even
   const int num_threads = 32;  // Threads to launch in a single 1-D block
   const int list_size = count * num_threads;
-  const unsigned long long start = 60000;
+  const unsigned long long start = 6;
   unsigned long long* list;  // Device pointer to potential primes
   cudaMalloc((void**)&list, list_size * sizeof(unsigned long long));
   dim3 gridSize(1,1,1);
@@ -154,19 +155,15 @@ int main( int argc, char** argv)
   startTime = clock();
   gettimeofday(&tv, &tz);
   GTODStartTime = tv.tv_sec * 1000 + tv.tv_usec / 1000;
-
+  
   // First, generate a list of prime candidates
   primeCandidates<<<gridSize, blockSize>>>(count, start, list);
-
   // Second, filter the candidates to quickly eliminate composites
   filterCandidates<<<gridSize, blockSize>>>(count, list);
+  
 
   // Third, confirm if candidates are actually prime
   testCandidates<<<gridSize, blockSize>>>(count, list);
-
-  // Copy list back and display (for debugging)
-  unsigned long long h_list[list_size];
-  cudaMemcpy(h_list, list, list_size * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
 
   gettimeofday(&tv, &tz);
   GTODEndTime = tv.tv_sec * 1000 + tv.tv_usec / 1000;
@@ -176,10 +173,16 @@ int main( int argc, char** argv)
   printf("        GetTimeOfDay Time= %g\n", (double)(GTODEndTime - GTODStartTime) / 1000.0);
   printf("        Clock Time       = %g\n", timeInSeconds);
 
+
+  // Copy list back and display (for debugging)
+  unsigned long long h_list[list_size];
+  cudaMemcpy(h_list, list, list_size * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+
+
   int nprimes = 0;
   for(int i = 0; i < list_size; i++){
     if (h_list[i] != 0) {
-      //printf("%llu\n",h_list[i]);
+//      printf("%llu\n",h_list[i]);
       nprimes++;
     }
   }
